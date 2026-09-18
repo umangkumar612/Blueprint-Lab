@@ -1,0 +1,30 @@
+const express = require('express')
+const cors = require('cors')
+const { clientUrl, evaluatorType, openAiKey } = require('./config/env')
+const InMemoryRepository = require('./repositories/InMemoryRepository')
+const AttemptService = require('./services/AttemptService')
+const EvaluationService = require('./services/EvaluationService')
+const RuleBasedEvaluator = require('./evaluators/RuleBasedEvaluator')
+const AIEvaluator = require('./evaluators/AIEvaluator')
+
+function createApp({ repository = new InMemoryRepository(), evaluator } = {}) {
+  const selectedEvaluator = evaluator || (evaluatorType === 'ai' && openAiKey ? new AIEvaluator(openAiKey) : new RuleBasedEvaluator())
+  const attempts = new AttemptService(repository)
+  const evaluations = new EvaluationService(repository, selectedEvaluator)
+  const app = express()
+  app.use(cors({ origin: clientUrl })); app.use(express.json({ limit: '60kb' }))
+  app.get('/api/health', (req, res) => res.json({ success: true, evaluator: selectedEvaluator.type }))
+  app.get('/api/problems', (req, res) => res.json({ data: attempts.listProblems() }))
+  app.get('/api/problems/:id', (req, res) => res.json({ data: attempts.getProblem(req.params.id) }))
+  app.post('/api/attempts', (req, res) => res.status(201).json({ data: attempts.createAttempt(req.body.problemId) }))
+  app.get('/api/attempts', (req, res) => res.json({ data: attempts.listAttempts() }))
+  app.get('/api/attempts/:id', (req, res) => res.json({ data: attempts.getAttempt(req.params.id) }))
+  app.get('/api/attempts/:id/submission', (req, res) => res.json({ data: attempts.getSubmission(req.params.id) }))
+  app.post('/api/attempts/:id/submission', (req, res) => res.status(201).json({ data: attempts.submit(req.params.id, req.body) }))
+  app.post('/api/attempts/:id/evaluate', async (req, res) => res.json({ data: await evaluations.evaluate(req.params.id) }))
+  app.get('/api/attempts/:id/evaluation', (req, res) => res.json({ data: evaluations.getEvaluation(req.params.id) }))
+  app.post('/api/evaluations/:id/retry', async (req, res) => res.json({ data: await evaluations.retry(req.params.id) }))
+  app.use((error, req, res, next) => { res.status(error.status || 500).json({ error: error.status ? error.message : 'Unexpected server error' }) })
+  return app
+}
+module.exports = createApp

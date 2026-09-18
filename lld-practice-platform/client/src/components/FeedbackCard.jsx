@@ -1,0 +1,3 @@
+export default function FeedbackCard({ item }) {
+  return <article className="feedback-card"><div className="feedback-heading"><div><span className="eyebrow">Criterion</span><h3>{item.criterion}</h3></div><span className="score"><b>{item.score}</b><small>/5</small></span></div><div className="feedback-grid"><div><span className="label">Evidence</span><p>{item.evidence}</p></div><div><span className="label">Concern</span><p>{item.concern}</p></div><div className="suggestion"><span className="label">Suggestion</span><p>{item.suggestion}</p></div></div><span className="confidence">Confidence {Math.round(item.confidence * 100)}%</span></article>
+}
